@@ -21,6 +21,16 @@ jobs:
           java-version: '21'
           distribution: 'temurin'
 
+      # 🔑 Forçar JAVA_HOME para o Java 21 instalado
+      - name: Forçar Java 21 como padrão
+        run: |
+          echo "JAVA_HOME=${{ steps.setup-java.outputs.path }}" >> $GITHUB_ENV
+          echo "${{ steps.setup-java.outputs.path }}/bin" >> $GITHUB_PATH
+        id: setup-java
+
+      - name: Verificar versão do Java
+        run: java -version
+
       - name: Cache do Gradle
         uses: actions/cache@v4
         with:
@@ -30,13 +40,6 @@ jobs:
           key: ${{ runner.os }}-gradle-${{ hashFiles('**/*.gradle*', '**/gradle-wrapper.properties') }}
           restore-keys: |
             ${{ runner.os }}-gradle-
-
-      - name: Verificar ficheiros críticos
-        run: |
-          echo "=== Gradle Wrapper presente? ==="
-          ls -la gradlew gradle/wrapper/gradle-wrapper.jar gradle/wrapper/gradle-wrapper.properties 2>/dev/null || echo "Erro: Wrapper em falta!"
-          echo "=== Access widener (não deve existir) ==="
-          find . -name "*.accesswidener" -type f -print || echo "Nenhum access widener encontrado"
 
       - name: Dar permissão de execução ao gradlew
         run: chmod +x ./gradlew
