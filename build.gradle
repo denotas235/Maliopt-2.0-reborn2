@@ -2,11 +2,16 @@ plugins {
     id 'fabric-loom' version '1.6.11'
     id 'maven-publish'
 }
+
 version = project.mod_version
 group = project.maven_group
 
 base {
     archivesName = project.archives_base_name
+}
+
+loom {
+    accessWidenerPath = file("src/main/resources/maliopt.accesswidener")
 }
 
 repositories {
