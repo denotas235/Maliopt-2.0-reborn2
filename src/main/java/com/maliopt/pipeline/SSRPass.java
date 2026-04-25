@@ -7,16 +7,6 @@ import net.minecraft.client.MinecraftClient;
 import net.minecraft.client.gl.Framebuffer;
 import org.lwjgl.opengl.*;
 
-/**
- * SSRPass — Screen-Space Reflections para Mali-G52.
- *
- * Ray-march em screen space a partir de cada fragment.
- * Quando ssrWaterOnly=true, limita o passe a pixels com
- * flag de água (via alpha channel codificado pelo mixin).
- *
- * Custo: O(ssrMaxSteps) por fragment visível.
- * Recomendado: maxSteps=16, ssrWaterOnly=true para Mali-G52.
- */
 public final class SSRPass {
 
     private static int program  = 0;
@@ -54,13 +44,11 @@ public final class SSRPass {
         "void main() {\n" +
         "    vec4 sceneColor = texture(uScene, vUv);\n" +
         "\n" +
-        "    // Quando waterOnly, usa alpha<0.99 como flag de água\n" +
         "    if (uWaterOnly == 1 && sceneColor.a > 0.99) {\n" +
         "        fragColor = sceneColor;\n" +
         "        return;\n" +
         "    }\n" +
         "\n" +
-        "    // Direção de reflexo simplificada (screen-space vertical flip)\n" +
         "    vec2 reflectDir = vec2(0.0, -1.0) * uStepSize * 0.01;\n" +
         "    vec2 sampleUv   = vUv;\n" +
         "    vec3 reflectColor = vec3(0.0);\n" +
@@ -79,7 +67,6 @@ public final class SSRPass {
         "        }\n" +
         "    }\n" +
         "\n" +
-        "    // Blend suave: 15% de reflexo\n" +
         "    vec3 finalColor = mix(sceneColor.rgb,\n" +
         "                         mix(sceneColor.rgb, reflectColor, 0.15),\n" +
         "                         found);\n" +
@@ -124,7 +111,6 @@ public final class SSRPass {
         GL11.glDisable(GL11.GL_DEPTH_TEST);
         GL11.glDisable(GL11.GL_BLEND);
 
-        // Render SSR para buffer intermédio
         GL30.glBindFramebuffer(GL30.GL_FRAMEBUFFER, ssrFbo);
         GL11.glViewport(0, 0, w, h);
         GL20.glUseProgram(program);
@@ -142,16 +128,15 @@ public final class SSRPass {
         GL30.glBindVertexArray(0);
         GL11.glBindTexture(GL11.GL_TEXTURE_2D, 0);
 
-        // Blit resultado → framebuffer do Minecraft
         GL30.glBindFramebuffer(GL30.GL_READ_FRAMEBUFFER, ssrFbo);
         GL30.glBindFramebuffer(GL30.GL_DRAW_FRAMEBUFFER, fb.fbo);
         GL30.glBlitFramebuffer(0, 0, w, h, 0, 0, w, h,
             GL11.GL_COLOR_BUFFER_BIT, GL11.GL_NEAREST);
 
-        // TBDR: invalidar buffer intermédio — não precisa voltar à DRAM
+        // CORRIGIDO: GL43 em vez de GL30
         int[] att = { GL30.GL_COLOR_ATTACHMENT0 };
         GL30.glBindFramebuffer(GL30.GL_FRAMEBUFFER, ssrFbo);
-        GL30.glInvalidateFramebuffer(GL30.GL_FRAMEBUFFER, att);
+        GL43.glInvalidateFramebuffer(GL43.GL_FRAMEBUFFER, att);
 
         GL30.glBindFramebuffer(GL30.GL_FRAMEBUFFER, prevFbo);
         GL20.glUseProgram(prevProgram);
@@ -231,4 +216,4 @@ public final class SSRPass {
         }
         return prog;
     }
-        }
+}
