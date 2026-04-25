@@ -1,280 +1,153 @@
-package com.maliopt.shader;
+package com.maliopt.performance;
 
 import com.maliopt.MaliOptMod;
-import org.lwjgl.opengl.GL20;
-import org.lwjgl.opengl.GL11;
+import com.maliopt.config.MaliOptVisualConfig;
+import net.minecraft.client.MinecraftClient;
 
-import java.util.regex.Pattern;
-import java.util.regex.Matcher;
+public final class PerformanceGuard {
 
-/**
- * ShaderExecutionLayer — Fase 3c (2/4)
- *
- * NÚCLEO do sistema. Transforma o MaliOpt de "mod com efeitos"
- * em "plataforma de execução de shaders para Mali".
- *
- * ── O QUE FAZ ────────────────────────────────────────────────────
- *   1. Injector de #defines — todo shader compilado pelo MaliOpt
- *      recebe automaticamente os defines certos para o hardware
- *
- *   2. Shader Adaptation — transforma GLSL genérico em GLSL optimizado
- *      para Mali (precision hints, fast paths, extensões injectadas)
- *
- *   3. Compiler wrapper — substituição de GL20.glCompileShader que
- *      intercala as transformações antes da compilação real
- *
- * ── DEFINES INJECTADOS ───────────────────────────────────────────
- *
- *   #define MALI_OPT 1              sempre presente se MaliOpt activo
- *   #define MALI_TBDR 1             se arquitectura TBDR (Mali-G series)
- *   #define MALI_PLS 1              se GL_EXT_shader_pixel_local_storage
- *   #define MALI_FB_FETCH 1         se GL_ARM_shader_framebuffer_fetch
- *   #define MALI_ASTC 1             se GL_KHR_texture_compression_astc_ldr
- *   #define MALI_BIFROST 1          se GPU Bifrost (G52, G72, G76...)
- *   #define MALI_VALHALL 1          se GPU Valhall (G710, G610...)
- *   #define MALI_QUALITY_LOW 1      / MEDIUM / HIGH — nível recomendado
- *   #define MALI_MEDIUMP_FAST 1     se mediump é mais rápido que highp
- *
- * ── COMO USAR NOS SHADERS ────────────────────────────────────────
- *
- *   #ifdef MALI_FB_FETCH
- *       vec4 scene = gl_LastFragColorARM;  // zero-DRAM
- *   #else
- *       vec4 scene = texture(uScene, vUv); // fallback
- *   #endif
- *
- *   #ifdef MALI_MEDIUMP_FAST
- *       precision mediump float;  // mais rápido no Mali
- *   #else
- *       precision highp float;
- *   #endif
- *
- * ── ADAPTAÇÕES AUTOMÁTICAS ───────────────────────────────────────
- *
- *   highp → mediump        em shaders marcados como MALI_MEDIUMP_OK
- *   texture2D → texture    moderniza GLSL 100 para 310 es
- *   gl_FragColor → out vec4 fragColor (modernização automática)
- */
-public final class ShaderExecutionLayer {
+    // Limiares internos — usados quando autoQuality=true
+    private static final int FPS_DEGRADED = 20;
+    private static final int FPS_LOW      = 35;
+    private static final int FPS_MEDIUM   = 55;
 
-    private static boolean active = false;
+    private static final int FRAMES_TO_DOWNGRADE = 60;
+    private static final int FRAMES_TO_UPGRADE   = 120;
 
-    // Padrão para detectar linha #version (deve ser a primeira)
-    private static final Pattern VERSION_PATTERN =
-        Pattern.compile("^(\\s*#version\\s+\\S+(?:\\s+\\S+)?)(.*)$",
-                        Pattern.MULTILINE | Pattern.DOTALL);
+    public enum Quality { DEGRADED, LOW, MEDIUM, HIGH }
 
-    private ShaderExecutionLayer() {}
+    private static Quality current      = Quality.HIGH;
+    private static Quality target       = Quality.HIGH;
+    private static int     frameCounter = 0;
+    private static int     sampleSum    = 0;
+    private static int     sampleCount  = 0;
+    private static long    lastLogTime  = 0;
 
-    // ════════════════════════════════════════════════════════════════
-    // ACTIVAÇÃO
-    // ════════════════════════════════════════════════════════════════
+    private static final int SAMPLE_WINDOW = 20;
 
-    public static void init() {
-        if (!ShaderCapabilities.isInitialised()) {
-            MaliOptMod.LOGGER.warn(
-                "[SEL] ShaderCapabilities não inicializado — chamar init() primeiro");
+    private PerformanceGuard() {}
+
+    public static void update(MinecraftClient mc) {
+        if (mc == null) return;
+
+        // Se autoQuality estiver desligado, mantém HIGH fixo
+        MaliOptVisualConfig cfg = MaliOptVisualConfig.get();
+        if (!cfg.autoQuality) {
+            if (current != Quality.HIGH) current = Quality.HIGH;
             return;
         }
-        active = true;
-        MaliOptMod.LOGGER.info("[SEL] ✅ ShaderExecutionLayer activo");
-        MaliOptMod.LOGGER.info("[SEL]    Defines: {}", buildDefineBlock().replace("\n", " | "));
+
+        int fps = mc.getCurrentFps();
+        sampleSum   += fps;
+        sampleCount++;
+
+        if (sampleCount >= SAMPLE_WINDOW) {
+            int avgFps = sampleSum / sampleCount;
+            sampleSum   = 0;
+            sampleCount = 0;
+            evaluateFps(avgFps, cfg.targetFPS);
+        }
     }
 
-    // ════════════════════════════════════════════════════════════════
-    // ENTRY POINT PRINCIPAL
-    // compile() — substitui GL20.glCompileShader em todos os passes
-    // ════════════════════════════════════════════════════════════════
+    private static void evaluateFps(int avgFps, int targetFps) {
+        // Usa o targetFPS do menu como limiar de MEDIUM
+        Quality desired = classify(avgFps, targetFps);
 
-    /**
-     * Compila um shader com todas as transformações Mali aplicadas.
-     *
-     * Uso nos passes:
-     *   int id = ShaderExecutionLayer.compile(GL_FRAGMENT_SHADER, src, "BloomFrag");
-     *
-     * @return shader ID compilado, ou 0 se falhou
-     */
-    public static int compile(int type, String source, String debugName) {
-        String transformed = active ? transform(source, debugName) : source;
+        if (desired == target) {
+            frameCounter++;
+            int threshold = (desired.ordinal() < current.ordinal())
+                ? FRAMES_TO_DOWNGRADE : FRAMES_TO_UPGRADE;
 
-        int id = GL20.glCreateShader(type);
-        GL20.glShaderSource(id, transformed);
-        GL20.glCompileShader(id);
-
-        if (GL20.glGetShaderi(id, GL20.GL_COMPILE_STATUS) == GL11.GL_FALSE) {
-            String log = GL20.glGetShaderInfoLog(id);
-            MaliOptMod.LOGGER.error("[SEL] Shader {} falhou:\n{}", debugName, log);
-
-            // Se a falha pode ser da transformação, loga o source transformado
-            if (active && !source.equals(transformed)) {
-                MaliOptMod.LOGGER.debug("[SEL] Source transformado:\n{}", transformed);
+            if (frameCounter >= threshold) {
+                applyQuality(desired, avgFps);
+                frameCounter = 0;
             }
-
-            GL20.glDeleteShader(id);
-            return 0;
+        } else {
+            target       = desired;
+            frameCounter = 0;
         }
-
-        return id;
     }
 
-    // ════════════════════════════════════════════════════════════════
-    // PIPELINE DE TRANSFORMAÇÃO
-    // ════════════════════════════════════════════════════════════════
+    private static Quality classify(int fps, int targetFps) {
+        if (fps < FPS_DEGRADED) return Quality.DEGRADED;
+        if (fps < FPS_LOW)      return Quality.LOW;
+        if (fps < targetFps)    return Quality.MEDIUM;
+        return Quality.HIGH;
+    }
 
-    /**
-     * Aplica todas as transformações ao source GLSL.
-     * Ordem: inject → adapt → validate
-     */
-    static String transform(String source, String debugName) {
-        String s = source;
+    private static void applyQuality(Quality q, int fps) {
+        if (q == current) return;
+        Quality prev = current;
+        current = q;
 
-        // 1. Injector de #defines Mali
-        s = injectDefines(s);
-
-        // 2. Adaptações de precision (Mali-specific)
-        if (ShaderCapabilities.MEDIUMP_FAST) {
-            s = adaptPrecision(s);
+        long now = System.currentTimeMillis();
+        if (now - lastLogTime > 3000) {
+            MaliOptMod.LOGGER.info("[PerfGuard] {} → {} (FPS médio: {})", prev, current, fps);
+            lastLogTime = now;
         }
-
-        // 3. Modernização GLSL (100 → 310 es patterns)
-        s = modernizeGLSL(s);
-
-        return s;
     }
 
-    // ════════════════════════════════════════════════════════════════
-    // 1. INJECTOR DE #DEFINES
-    // Insere o bloco Mali logo após o #version
-    // ════════════════════════════════════════════════════════════════
+    // ── API consumida pelos passes ────────────────────────────────────
 
-    private static String injectDefines(String source) {
-        String defines = buildDefineBlock();
-
-        Matcher m = VERSION_PATTERN.matcher(source);
-        if (m.find()) {
-            // Insere defines logo após a linha #version
-            String versionLine = m.group(1);
-            String rest        = m.group(2);
-            return versionLine + "\n" + defines + rest;
-        }
-
-        // Sem #version — insere no topo
-        return defines + source;
+    public static boolean bloomEnabled() {
+        MaliOptVisualConfig cfg = MaliOptVisualConfig.get();
+        return cfg.bloomEnabled && current != Quality.DEGRADED;
     }
 
-    private static String buildDefineBlock() {
-        StringBuilder sb = new StringBuilder();
-        sb.append("\n// ── MaliOpt ShaderExecutionLayer ────────────────────\n");
-        sb.append("#define MALI_OPT 1\n");
-
-        if (ShaderCapabilities.TBDR)
-            sb.append("#define MALI_TBDR 1\n");
-        if (ShaderCapabilities.PLS)
-            sb.append("#define MALI_PLS 1\n");
-        if (ShaderCapabilities.FB_FETCH)
-            sb.append("#define MALI_FB_FETCH 1\n");
-        if (ShaderCapabilities.FB_FETCH_DEPTH)
-            sb.append("#define MALI_FB_FETCH_DEPTH 1\n");
-        if (ShaderCapabilities.ASTC)
-            sb.append("#define MALI_ASTC 1\n");
-        if (ShaderCapabilities.BIFROST)
-            sb.append("#define MALI_BIFROST 1\n");
-        if (ShaderCapabilities.VALHALL)
-            sb.append("#define MALI_VALHALL 1\n");
-        if (ShaderCapabilities.MEDIUMP_FAST)
-            sb.append("#define MALI_MEDIUMP_FAST 1\n");
-        if (ShaderCapabilities.MULTISAMPLED_RT)
-            sb.append("#define MALI_MSRT 1\n");
-
-        // Quality level
-        switch (ShaderCapabilities.recommendedQuality()) {
-            case HIGH:
-                sb.append("#define MALI_QUALITY_HIGH 1\n");
-                sb.append("#define MALI_QUALITY 2\n");
-                break;
-            case MEDIUM:
-                sb.append("#define MALI_QUALITY_MEDIUM 1\n");
-                sb.append("#define MALI_QUALITY 1\n");
-                break;
-            default:
-                sb.append("#define MALI_QUALITY_LOW 1\n");
-                sb.append("#define MALI_QUALITY 0\n");
-                break;
-        }
-
-        sb.append("// ──────────────────────────────────────────────────\n\n");
-        return sb.toString();
+    public static boolean lightingPassEnabled() {
+        MaliOptVisualConfig cfg = MaliOptVisualConfig.get();
+        return cfg.lightingEnabled && current != Quality.DEGRADED;
     }
 
-    // ════════════════════════════════════════════════════════════════
-    // 2. ADAPTAÇÃO DE PRECISION
-    // Mali Bifrost: mediump é executado em 16-bit SIMD (2x throughput)
-    // highp desnecessário em shaders de post-processing
-    // ════════════════════════════════════════════════════════════════
-
-    private static final Pattern HIGHP_UNIFORM =
-        Pattern.compile("uniform\\s+highp\\s+(float|vec[234]|mat[234])");
-
-    private static String adaptPrecision(String source) {
-        // Shaders de post-processing (bloom, lighting) não precisam de highp
-        // Só substituímos em shaders sem "MALI_PRECISION_KEEP" no source
-        if (source.contains("MALI_PRECISION_KEEP")) return source;
-
-        // Rebaixa uniforms highp → mediump em passes de post-process
-        // (não toca em depth/shadow shaders)
-        if (isPostProcessShader(source)) {
-            source = HIGHP_UNIFORM.matcher(source)
-                       .replaceAll("uniform mediump $1");
-        }
-        return source;
+    public static float bloomIntensity() {
+        MaliOptVisualConfig cfg = MaliOptVisualConfig.get();
+        if (current == Quality.DEGRADED) return 0.0f;
+        // Respeita slider do menu, mas escala com qualidade
+        float base = cfg.bloomIntensity;
+        return switch (current) {
+            case LOW    -> base * 0.4f;
+            case MEDIUM -> base * 0.7f;
+            default     -> base;
+        };
     }
 
-    private static boolean isPostProcessShader(String source) {
-        // Heurística: post-process não usa gl_FragDepth nem shadow samplers
-        return !source.contains("gl_FragDepth")
-            && !source.contains("sampler2DShadow")
-            && !source.contains("samplerCubeShadow");
+    public static float bloomRadius() {
+        return switch (current) {
+            case DEGRADED -> 0.0f;
+            case LOW      -> 0.8f;
+            case MEDIUM   -> 1.2f;
+            default       -> 1.8f;
+        };
     }
 
-    // ════════════════════════════════════════════════════════════════
-    // 3. MODERNIZAÇÃO GLSL
-    // Converte padrões GLSL 100 → GLSL 310 es onde seguro
-    // ════════════════════════════════════════════════════════════════
-
-    private static String modernizeGLSL(String source) {
-        // texture2D() → texture() (GLSL 130+)
-        // Só em shaders que já usam #version 300 es ou superior
-        if (source.contains("#version 3") || source.contains("#version 310")) {
-            source = source.replace("texture2D(", "texture(");
-            source = source.replace("textureCube(", "texture(");
-        }
-        return source;
+    public static float bloomThreshold() {
+        return switch (current) {
+            case DEGRADED -> 1.0f;
+            case LOW      -> 0.80f;
+            case MEDIUM   -> 0.65f;
+            default       -> 0.55f;
+        };
     }
 
-    // ════════════════════════════════════════════════════════════════
-    // UTILITÁRIOS PÚBLICOS
-    // ════════════════════════════════════════════════════════════════
-
-    /**
-     * Retorna o bloco de defines como string para logging/debug.
-     */
-    public static String getDefinesSummary() {
-        return buildDefineBlock()
-            .replaceAll("//.*\n", "")
-            .replaceAll("\n+", " ")
-            .trim();
+    public static float warmth() {
+        MaliOptVisualConfig cfg = MaliOptVisualConfig.get();
+        if (current == Quality.DEGRADED) return 0.0f;
+        return switch (current) {
+            case LOW    -> cfg.warmthStrength * 0.6f;
+            default     -> cfg.warmthStrength;
+        };
     }
 
-    /**
-     * Verifica se o SEL está activo e pronto para transformar shaders.
-     */
-    public static boolean isActive() { return active; }
+    public static float ambientOcclusion() {
+        MaliOptVisualConfig cfg = MaliOptVisualConfig.get();
+        if (current == Quality.DEGRADED) return 0.0f;
+        return switch (current) {
+            case LOW    -> cfg.aoStrength * 0.5f;
+            case MEDIUM -> cfg.aoStrength * 0.85f;
+            default     -> cfg.aoStrength;
+        };
+    }
 
-    /**
-     * Desactiva o SEL (para debug — todos os shaders ficam sem transforms).
-     */
-    public static void disable() {
-        active = false;
-        MaliOptMod.LOGGER.warn("[SEL] ⚠ ShaderExecutionLayer desactivado");
-    }
-    }
+    public static Quality getCurrentQuality() { return current; }
+    public static int     targetFpsForHigh()  { return FPS_MEDIUM; }
+}
