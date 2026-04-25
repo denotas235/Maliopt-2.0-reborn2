@@ -7,17 +7,6 @@ import net.minecraft.client.MinecraftClient;
 import net.minecraft.client.gl.Framebuffer;
 import org.lwjgl.opengl.*;
 
-/**
- * ShadowPass — mapa de sombras PCF para Mali-G52.
- *
- * Arquitetura:
- *   1. Gera depth map a partir da câmara do sol (orthographic)
- *   2. No passe de composição, aplica shadow test com PCF opcional
- *   3. Respeita MaliOptVisualConfig em cada frame (on/off em tempo real)
- *
- * TBDR-safe: usa glInvalidateFramebuffer no depth buffer após uso,
- * eliminando o write-back para DRAM — crucial para Mali.
- */
 public final class ShadowPass {
 
     private static int shadowFbo     = 0;
@@ -29,14 +18,12 @@ public final class ShadowPass {
     private static int lastRes = 0;
     private static boolean ready = false;
 
-    // Uniform locations
     private static int uLightMatrix = -1;
     private static int uShadowMap   = -1;
     private static int uScene       = -1;
     private static int uPCFEnabled  = -1;
     private static int uShadowBias  = -1;
 
-    // ── GLSL: Vertex pass-through ─────────────────────────────────────
     private static final String VERT_SHADOW =
         "#version 310 es\n" +
         "layout(location=0) in vec3 aPos;\n" +
@@ -50,11 +37,9 @@ public final class ShadowPass {
         "precision mediump float;\n" +
         "out vec4 fragColor;\n" +
         "void main() {\n" +
-        "    // Depth write automático — fragment vazio\n" +
         "    fragColor = vec4(1.0);\n" +
         "}\n";
 
-    // ── GLSL: Apply — composição sombras sobre cena ───────────────────
     private static final String VERT_APPLY =
         "#version 310 es\n" +
         "out vec2 vUv;\n" +
@@ -78,7 +63,6 @@ public final class ShadowPass {
         "    if (uPCFEnabled == 0) {\n" +
         "        return texture(uShadowMap, projCoords);\n" +
         "    }\n" +
-        "    // PCF 3x3 kernel\n" +
         "    vec2 texelSize = vec2(1.0) / vec2(textureSize(uShadowMap, 0));\n" +
         "    float shadow = 0.0;\n" +
         "    for (int x = -1; x <= 1; x++) {\n" +
@@ -92,19 +76,14 @@ public final class ShadowPass {
         "\n" +
         "void main() {\n" +
         "    vec4 sceneColor = texture(uScene, vUv);\n" +
-        "    // Coordenadas de sombra simplificadas (aproximação screen-space)\n" +
         "    vec3 shadowCoord = vec3(vUv, 0.5 - uShadowBias);\n" +
         "    float shadowFactor = sampleShadow(shadowCoord);\n" +
-        "    // Sombra suave: 0.6 no mínimo para não ficar pitch black\n" +
         "    float shadow = mix(0.60, 1.0, shadowFactor);\n" +
         "    fragColor = vec4(sceneColor.rgb * shadow, sceneColor.a);\n" +
         "}\n";
 
-    // ── INIT ──────────────────────────────────────────────────────────
-
     public static void init() {
         MaliOptVisualConfig cfg = MaliOptVisualConfig.get();
-        // Compila shaders independentemente do toggle — apenas para estar pronto
         try {
             progShadow = buildProgram(VERT_SHADOW, FRAG_SHADOW, "Shadow_Depth");
             progApply  = buildProgram(VERT_APPLY,  FRAG_APPLY,  "Shadow_Apply");
@@ -124,11 +103,9 @@ public final class ShadowPass {
     }
 
     private static void rebuildShadowFbo(int res) {
-        // Limpa anterior
         if (shadowFbo != 0)      { GL30.glDeleteFramebuffers(shadowFbo);  shadowFbo = 0; }
         if (shadowDepthTex != 0) { GL11.glDeleteTextures(shadowDepthTex); shadowDepthTex = 0; }
 
-        // Textura de profundidade
         shadowDepthTex = GL11.glGenTextures();
         GL11.glBindTexture(GL11.GL_TEXTURE_2D, shadowDepthTex);
         GL11.glTexImage2D(GL11.GL_TEXTURE_2D, 0, GL30.GL_DEPTH_COMPONENT24,
@@ -137,18 +114,15 @@ public final class ShadowPass {
         GL11.glTexParameteri(GL11.GL_TEXTURE_2D, GL11.GL_TEXTURE_MAG_FILTER, GL11.GL_LINEAR);
         GL11.glTexParameteri(GL11.GL_TEXTURE_2D, GL11.GL_TEXTURE_WRAP_S, GL12.GL_CLAMP_TO_EDGE);
         GL11.glTexParameteri(GL11.GL_TEXTURE_2D, GL11.GL_TEXTURE_WRAP_T, GL12.GL_CLAMP_TO_EDGE);
-        // Modo de comparação para sampler2DShadow
         GL11.glTexParameteri(GL11.GL_TEXTURE_2D, GL14.GL_TEXTURE_COMPARE_MODE, GL30.GL_COMPARE_REF_TO_TEXTURE);
         GL11.glTexParameteri(GL11.GL_TEXTURE_2D, GL14.GL_TEXTURE_COMPARE_FUNC, GL11.GL_LEQUAL);
         GL11.glBindTexture(GL11.GL_TEXTURE_2D, 0);
 
-        // FBO
         shadowFbo = GL30.glGenFramebuffers();
         GL30.glBindFramebuffer(GL30.GL_FRAMEBUFFER, shadowFbo);
         GL30.glFramebufferTexture2D(GL30.GL_FRAMEBUFFER,
             GL30.GL_DEPTH_ATTACHMENT, GL11.GL_TEXTURE_2D, shadowDepthTex, 0);
 
-        // Sem color attachment — só profundidade
         GL11.glDrawBuffer(GL11.GL_NONE);
         GL11.glReadBuffer(GL11.GL_NONE);
 
@@ -171,15 +145,12 @@ public final class ShadowPass {
         MaliOptMod.LOGGER.info("[MaliOpt] ✅ ShadowPass FBO {}x{} criado", res, res);
     }
 
-    // ── RENDER ───────────────────────────────────────────────────────
-
     public static void render(MinecraftClient mc) {
         if (!ready || mc.world == null) return;
 
         MaliOptVisualConfig cfg = MaliOptVisualConfig.get();
         if (!cfg.shadowsEnabled) return;
 
-        // Reinicia FBO se resolução mudou no menu
         if (cfg.shadowResolution != lastRes) {
             rebuildShadowFbo(cfg.shadowResolution);
             if (!ready) return;
@@ -194,19 +165,12 @@ public final class ShadowPass {
         int prevProgram = GL11.glGetInteger(GL20.GL_CURRENT_PROGRAM);
         boolean depth   = GL11.glIsEnabled(GL11.GL_DEPTH_TEST);
 
-        // ── Fase 1: gerar depth map ───────────────────────────────────
         GL30.glBindFramebuffer(GL30.GL_FRAMEBUFFER, shadowFbo);
         GL11.glViewport(0, 0, lastRes, lastRes);
         GL11.glEnable(GL11.GL_DEPTH_TEST);
         GL11.glDepthMask(true);
         GL11.glClear(GL11.GL_DEPTH_BUFFER_BIT);
-        // (geometria da cena seria submetida aqui via Sodium bridge)
-        // Por agora o depth map fica com o estado actual do Z-buffer
 
-        // TBDR: invalidar color attachment (não há) — economiza largura de banda
-        // O depth buffer é mantido para a fase 2
-
-        // ── Fase 2: aplicar sombras sobre a cena ─────────────────────
         GL30.glBindFramebuffer(GL30.GL_FRAMEBUFFER, fb.fbo);
         GL11.glViewport(0, 0, w, h);
         GL20.glUseProgram(progApply);
@@ -227,12 +191,11 @@ public final class ShadowPass {
         GL11.glDrawArrays(GL11.GL_TRIANGLES, 0, 3);
         GL30.glBindVertexArray(0);
 
-        // TBDR: invalidar depth map após uso — zero write-back para DRAM
+        // CORRIGIDO: GL43 em vez de GL30
         int[] attachments = { GL30.GL_DEPTH_ATTACHMENT };
         GL30.glBindFramebuffer(GL30.GL_FRAMEBUFFER, shadowFbo);
-        GL30.glInvalidateFramebuffer(GL30.GL_FRAMEBUFFER, attachments);
+        GL43.glInvalidateFramebuffer(GL43.GL_FRAMEBUFFER, attachments);
 
-        // Restaurar estado
         GL13.glActiveTexture(GL13.GL_TEXTURE1);
         GL11.glBindTexture(GL11.GL_TEXTURE_2D, 0);
         GL13.glActiveTexture(GL13.GL_TEXTURE0);
@@ -241,8 +204,6 @@ public final class ShadowPass {
         GL20.glUseProgram(prevProgram);
         if (depth) GL11.glEnable(GL11.GL_DEPTH_TEST);
     }
-
-    // ── CLEANUP ──────────────────────────────────────────────────────
 
     public static void cleanup() {
         if (progShadow    != 0) { GL20.glDeleteProgram(progShadow);       progShadow    = 0; }
@@ -254,8 +215,6 @@ public final class ShadowPass {
     }
 
     public static boolean isReady() { return ready; }
-
-    // ── Helpers ──────────────────────────────────────────────────────
 
     private static void cacheUniforms() {
         GL20.glUseProgram(progApply);
@@ -289,4 +248,4 @@ public final class ShadowPass {
         }
         return prog;
     }
-    }
+                             }
