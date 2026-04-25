@@ -1,5 +1,5 @@
 plugins {
-    id 'fabric-loom' version '1.6.11'
+    id 'net.fabricmc.fabric-loom-remap' version "${loom_version}"
     id 'maven-publish'
 }
 
@@ -8,10 +8,6 @@ group = project.maven_group
 
 base {
     archivesName = project.archives_base_name
-}
-
-loom {
-    accessWidenerPath = file("src/main/resources/maliopt.accesswidener")
 }
 
 repositories {
@@ -35,10 +31,7 @@ dependencies {
     modImplementation "net.fabricmc:fabric-loader:${project.loader_version}"
     modImplementation "net.fabricmc.fabric-api:fabric-api:${project.fabric_version}"
 
-    // YACL – YetAnotherConfigLib
     modImplementation "dev.isxander:yet-another-config-lib:3.8.2+1.21.1-fabric"
-
-    // Mod Menu
     modImplementation "com.terraformersmc:modmenu:11.0.4"
 }
 
