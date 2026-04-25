@@ -10,21 +10,6 @@ import net.minecraft.util.math.BlockPos;
 import net.minecraft.world.LightType;
 import org.lwjgl.opengl.*;
 
-/**
- * ColoredLightsPass — iluminação colorida dinâmica para Mali-G52.
- *
- * Recolhe até maxDynamicLights fontes de luz à volta do jogador,
- * determina a sua cor e aplica um blend aditivo no screen space.
- *
- * Filosofia:
- *   - Tochas        → laranja (1.0, 0.55, 0.1)
- *   - Soul Fire     → ciano   (0.2, 0.8, 1.0)
- *   - Glowstone     → amarelo (1.0, 0.9, 0.5)
- *   - Sculk Sensor  → violeta (0.5, 0.1, 1.0)
- *   - Outros        → branco  (1.0, 1.0, 0.9)
- *
- * TBDR-safe: single fullscreen pass, zero geometry extra.
- */
 public final class ColoredLightsPass {
 
     private static final int MAX_LIGHTS_HARD_CAP = 8;
@@ -37,10 +22,8 @@ public final class ColoredLightsPass {
     private static int lastH    = 0;
     private static boolean ready = false;
 
-    // Uniforms
     private static int uScene      = -1;
     private static int uLightCount = -1;
-    // Arrays de uniforms para N luzes
     private static int[] uLightPos   = new int[MAX_LIGHTS_HARD_CAP];
     private static int[] uLightColor = new int[MAX_LIGHTS_HARD_CAP];
     private static int[] uLightRadius= new int[MAX_LIGHTS_HARD_CAP];
@@ -59,9 +42,9 @@ public final class ColoredLightsPass {
         "precision mediump float;\n" +
         "uniform sampler2D uScene;\n" +
         "uniform int   uLightCount;\n" +
-        "uniform vec2  uLightPos[8];\n" +     // posição normalizada em screen space
+        "uniform vec2  uLightPos[8];\n" +
         "uniform vec3  uLightColor[8];\n" +
-        "uniform float uLightRadius[8];\n" +  // raio em UV (0.0-1.0)
+        "uniform float uLightRadius[8];\n" +
         "in vec2 vUv;\n" +
         "out vec4 fragColor;\n" +
         "\n" +
@@ -72,7 +55,7 @@ public final class ColoredLightsPass {
         "    for (int i = 0; i < uLightCount; i++) {\n" +
         "        float dist = distance(vUv, uLightPos[i]);\n" +
         "        float att  = 1.0 - smoothstep(0.0, uLightRadius[i], dist);\n" +
-        "        lightAccum += uLightColor[i] * att * 0.12;\n" + // 12% de aditivo
+        "        lightAccum += uLightColor[i] * att * 0.12;\n" +
         "    }\n" +
         "\n" +
         "    vec3 finalColor = clamp(scene + lightAccum * scene, 0.0, 1.0);\n" +
@@ -109,7 +92,6 @@ public final class ColoredLightsPass {
         if (w != lastW || h != lastH) rebuildFbo(w, h);
         if (outFbo == 0) return;
 
-        // Recolhe fontes de luz próximas
         LightSource[] lights = gatherLights(mc, cfg.maxDynamicLights);
         if (lights.length == 0) return;
 
@@ -147,17 +129,16 @@ public final class ColoredLightsPass {
         GL30.glBlitFramebuffer(0, 0, w, h, 0, 0, w, h,
             GL11.GL_COLOR_BUFFER_BIT, GL11.GL_NEAREST);
 
+        // CORRIGIDO: GL43 em vez de GL30
         int[] att = { GL30.GL_COLOR_ATTACHMENT0 };
         GL30.glBindFramebuffer(GL30.GL_FRAMEBUFFER, outFbo);
-        GL30.glInvalidateFramebuffer(GL30.GL_FRAMEBUFFER, att);
+        GL43.glInvalidateFramebuffer(GL43.GL_FRAMEBUFFER, att);
 
         GL30.glBindFramebuffer(GL30.GL_FRAMEBUFFER, prevFbo);
         GL20.glUseProgram(prevProgram);
         if (depth) GL11.glEnable(GL11.GL_DEPTH_TEST);
         if (blend) GL11.glEnable(GL11.GL_BLEND);
     }
-
-    // ── Recolha de luzes ──────────────────────────────────────────────
 
     private static LightSource[] gatherLights(MinecraftClient mc, int maxLights) {
         ClientWorld world  = mc.world;
@@ -166,7 +147,7 @@ public final class ColoredLightsPass {
         int found = 0;
 
         BlockPos playerPos = mc.player.getBlockPos();
-        int range = 12; // blocos de raio
+        int range = 12;
 
         for (int dx = -range; dx <= range && found < cap; dx++) {
             for (int dz = -range; dz <= range && found < cap; dz++) {
@@ -180,7 +161,6 @@ public final class ColoredLightsPass {
 
                     float[] color = colorFromBlock(blockId);
 
-                    // Posição em screen space (approximação simples)
                     float uvX = 0.5f + (dx / (float)(range * 2));
                     float uvY = 0.5f - (dy / (float)(range * 2));
                     float radius = 0.08f + (blockLight / 15.0f) * 0.06f;
@@ -190,7 +170,6 @@ public final class ColoredLightsPass {
             }
         }
 
-        // Retorna apenas o subarray preenchido
         LightSource[] trimmed = new LightSource[found];
         System.arraycopy(result, 0, trimmed, 0, found);
         return trimmed;
@@ -209,10 +188,8 @@ public final class ColoredLightsPass {
             return new float[]{ 1.00f, 0.30f, 0.05f };
         if (blockId.contains("beacon"))
             return new float[]{ 0.40f, 1.00f, 0.60f };
-        return new float[]{ 1.00f, 1.00f, 0.90f }; // branco quente
+        return new float[]{ 1.00f, 1.00f, 0.90f };
     }
-
-    // ── FBO ──────────────────────────────────────────────────────────
 
     private static void rebuildFbo(int w, int h) {
         if (outFbo != 0) { GL30.glDeleteFramebuffers(outFbo); outFbo = 0; }
@@ -246,8 +223,6 @@ public final class ColoredLightsPass {
         lastW = w; lastH = h;
     }
 
-    // ── Cleanup ───────────────────────────────────────────────────────
-
     public static void cleanup() {
         if (program != 0) { GL20.glDeleteProgram(program);      program = 0; }
         if (quadVao != 0) { GL30.glDeleteVertexArrays(quadVao); quadVao = 0; }
@@ -257,8 +232,6 @@ public final class ColoredLightsPass {
     }
 
     public static boolean isReady() { return ready; }
-
-    // ── Helpers ──────────────────────────────────────────────────────
 
     private static void cacheUniforms() {
         GL20.glUseProgram(program);
@@ -294,8 +267,6 @@ public final class ColoredLightsPass {
         return prog;
     }
 
-    // ── Data class ───────────────────────────────────────────────────
-
     private static final class LightSource {
         final float uvX, uvY, r, g, b, radius;
         LightSource(float uvX, float uvY, float r, float g, float b, float radius) {
@@ -304,4 +275,4 @@ public final class ColoredLightsPass {
             this.radius = radius;
         }
     }
-}
+    }
