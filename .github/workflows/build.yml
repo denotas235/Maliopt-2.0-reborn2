@@ -2,9 +2,9 @@ name: Build MaliOpt
 
 on:
   push:
-    branches: [ main, master, develop ]
+    branches: [ 1.21.1 ]
   pull_request:
-    branches: [ main, master ]
+    branches: [ 1.21.1 ]
   workflow_dispatch:
 
 jobs:
@@ -21,23 +21,13 @@ jobs:
           java-version: '21'
           distribution: 'temurin'
 
-      # 🔑 Forçar Java 21 como padrão definitivo
       - name: Forçar Java 21 como padrão
         run: |
           echo "JAVA_HOME=$JAVA_HOME" >> $GITHUB_ENV
           echo "$JAVA_HOME/bin" >> $GITHUB_PATH
 
-      - name: Verificar versão do Java
-        run: java -version
-
-      # 🗑️ Eliminar access wideners e cache do Loom
-      - name: Limpar access wideners e cache do Loom
-        run: |
-          echo "🔍 Procurando ficheiros .accesswidener..."
-          find . -name "*.accesswidener" -type f -print -delete || true
-          echo "🗑️  Removendo cache do Loom..."
-          rm -rf .gradle/loom-cache || true
-          echo "✅ Limpeza concluída."
+      - name: Remover access wideners (segurança)
+        run: find . -name "*.accesswidener" -type f -delete || true
 
       - name: Cache do Gradle
         uses: actions/cache@v4
