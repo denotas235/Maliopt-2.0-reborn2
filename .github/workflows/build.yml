@@ -21,12 +21,11 @@ jobs:
           java-version: '21'
           distribution: 'temurin'
 
-      # 🔑 Forçar JAVA_HOME para o Java 21 instalado
+      # 🔑 Forçar Java 21 como padrão definitivo
       - name: Forçar Java 21 como padrão
         run: |
-          echo "JAVA_HOME=${{ steps.setup-java.outputs.path }}" >> $GITHUB_ENV
-          echo "${{ steps.setup-java.outputs.path }}/bin" >> $GITHUB_PATH
-        id: setup-java
+          echo "JAVA_HOME=$JAVA_HOME" >> $GITHUB_ENV
+          echo "$JAVA_HOME/bin" >> $GITHUB_PATH
 
       - name: Verificar versão do Java
         run: java -version
