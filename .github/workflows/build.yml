@@ -1,3 +1,4 @@
+```yaml
 name: Build MaliOpt
 
 on:
@@ -32,12 +33,15 @@ jobs:
           path: |
             ~/.gradle/caches
             ~/.gradle/wrapper
-          key: ${{ runner.os }}-gradle-${{ hashFiles('**/*.gradle*', '**/gradle-wrapper.properties') }}
+          key: ${{ runner.os }}-gradle-${{ hashFiles('**/*.gradle*', '**/gradle-wrapper.properties', '**/*.accesswidener') }}
           restore-keys: |
             ${{ runner.os }}-gradle-
 
       - name: Dar permissão de execução ao gradlew
         run: chmod +x ./gradlew
+
+      - name: Escrever accesswidener limpo
+        run: printf 'accessWidener v2 named\n' > src/main/resources/maliopt.accesswidener
 
       - name: Compilar com Gradle Wrapper
         run: ./gradlew clean build --no-daemon
@@ -57,3 +61,4 @@ jobs:
           generate_release_notes: true
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+```
