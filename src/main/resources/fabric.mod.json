@@ -1,38 +1,47 @@
 {
-	"schemaVersion": 1,
-	"id": "modid",
-	"version": "${version}",
-	"name": "Example Mod",
-	"description": "This is an example description! Tell everyone what your mod is about!",
-	"authors": [
-		"Me!"
-	],
-	"contact": {
-		"homepage": "https://fabricmc.net/",
-		"sources": "https://github.com/FabricMC/fabric-example-mod"
-	},
-	"license": "CC0-1.0",
-	"icon": "assets/modid/icon.png",
-	"environment": "*",
-	"entrypoints": {
-		"main": [
-			"com.example.ExampleMod"
-		],
-		"client": [
-			"com.example.client.ExampleModClient"
-		]
-	},
-	"mixins": [
-		"modid.mixins.json",
-		{
-			"config": "modid.client.mixins.json",
-			"environment": "client"
-		}
-	],
-	"depends": {
-		"fabricloader": ">=0.19.2",
-		"minecraft": "~1.21.1",
-		"java": ">=21",
-		"fabric-api": "*"
-	}
+  "schemaVersion": 1,
+  "id": "maliopt",
+  "version": "${version}",
+  "name": "MaliOpt",
+  "description": "Otimização visual e pipeline TBDR para GPUs ARM Mali (Bifrost/Valhall). Renderizador híbrido OpenGL 4.6 → GLES 3.2 com suporte a PLS, FBFetch, ASTC e Shader Cache.",
+  "authors": [
+    "Denotas"
+  ],
+  "contact": {
+    "homepage": "https://github.com/denotaravys-pixel/HYBRIDLOADER",
+    "sources": "https://github.com/denotaravys-pixel/HYBRIDLOADER"
+  },
+  "license": "Apache-2.0",
+  "icon": "assets/maliopt/icon.png",
+  "environment": "client",
+  "entrypoints": {
+    "client": [
+      "com.maliopt.MaliOptMod"
+    ],
+    "modmenu": [
+      "com.maliopt.MaliOptMod"
+    ]
+  },
+  "mixins": [
+    "maliopt.mixins.json"
+  ],
+  "depends": {
+    "fabricloader": ">=0.15.0",
+    "minecraft": "~1.21.1",
+    "java": ">=21",
+    "fabric-api": "*",
+    "yet_another_config_lib_v3": "*",
+    "modmenu": ">=11.0.0"
+  },
+  "suggests": {
+    "sodium": "*",
+    "iris": "*"
+  },
+  "custom": {
+    "hyengra": {
+      "optimized": true,
+      "minMaliOptVersion": "1.0.0",
+      "features": ["shadows", "ssr", "coloredLights", "bloom", "pls", "fbfetch", "tbdroptimizer"]
+    }
+  }
 }
