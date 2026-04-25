@@ -30,6 +30,15 @@ jobs:
       - name: Verificar versão do Java
         run: java -version
 
+      # 🗑️ Eliminar access wideners e cache do Loom
+      - name: Limpar access wideners e cache do Loom
+        run: |
+          echo "🔍 Procurando ficheiros .accesswidener..."
+          find . -name "*.accesswidener" -type f -print -delete || true
+          echo "🗑️  Removendo cache do Loom..."
+          rm -rf .gradle/loom-cache || true
+          echo "✅ Limpeza concluída."
+
       - name: Cache do Gradle
         uses: actions/cache@v4
         with:
