@@ -135,13 +135,13 @@ public final class ShadowPass {
         GL11.glDepthMask(true);
         GL11.glClear(GL11.GL_DEPTH_BUFFER_BIT);
 
-        GL30.glBindFramebuffer(GL30.GL_FRAMEBUFFER, fb.getFramebufferId());
+        GL30.glBindFramebuffer(GL30.GL_FRAMEBUFFER, com.maliopt.util.FramebufferUtil.getFboId(fb));
         GL11.glViewport(0, 0, w, h);
         GL20.glUseProgram(progApply);
         GL20.glUniform1f(uShadowBias, 0.005f);
         GL20.glUniform1i(uPCFEnabled, cfg.shadowSoftEnabled ? 1 : 0);
         GL13.glActiveTexture(GL13.GL_TEXTURE0);
-        GL11.glBindTexture(GL11.GL_TEXTURE_2D, fb.getColorAttachmentId());
+        GL11.glBindTexture(GL11.GL_TEXTURE_2D, com.maliopt.util.FramebufferUtil.getColorTextureId(fb));
         GL20.glUniform1i(uScene, 0);
         GL13.glActiveTexture(GL13.GL_TEXTURE1);
         GL11.glBindTexture(GL11.GL_TEXTURE_2D, shadowDepthTex);

@@ -107,7 +107,7 @@ public class MaliOptMod implements ClientModInitializer, ModMenuApi {
         });
 
         // ── Pipeline de post-process ──────────────────────────────────
-        WorldRenderEvents.LAST.register(context -> {
+        WorldRenderEvents.END.register(context -> {
             MinecraftClient mc = MinecraftClient.getInstance();
             MaliOptVisualConfig cfg = MaliOptVisualConfig.get();
 
