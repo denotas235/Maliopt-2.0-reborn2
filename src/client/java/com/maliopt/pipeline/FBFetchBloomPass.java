@@ -145,7 +145,7 @@ public class FBFetchBloomPass {
     }
 
     public static void render(MinecraftClient mc) {
-        if (!ready || mc.world == null) return;
+        if (!ready || mc == null || mc.world == null || mc.player == null) return;
         if (!PerformanceGuard.bloomEnabled()) return;
 
         Framebuffer fb = mc.getFramebuffer();

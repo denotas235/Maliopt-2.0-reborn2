@@ -188,7 +188,7 @@ public class PLSLightingPass {
     // ── RENDER ───────────────────────────────────────────────────────
 
     public static void render(MinecraftClient mc) {
-        if (!ready || program == 0 || mc.world == null) return;
+        if (!ready || program == 0 || mc == null || mc.world == null || mc.player == null) return;
         if (!PerformanceGuard.lightingPassEnabled()) return;
 
         Framebuffer fb = mc.getFramebuffer();

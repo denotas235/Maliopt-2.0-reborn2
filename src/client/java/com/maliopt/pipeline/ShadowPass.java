@@ -116,7 +116,7 @@ public final class ShadowPass {
     }
 
     public static void render(MinecraftClient mc) {
-        if (!ready || mc.world == null) return;
+        if (!ready || mc == null || mc.world == null || mc.player == null) return;
         MaliOptVisualConfig cfg = MaliOptVisualConfig.get();
         if (!cfg.shadowsEnabled) return;
         if (cfg.shadowResolution != lastRes) { rebuildShadowFbo(cfg.shadowResolution); if (!ready) return; }
