@@ -47,6 +47,7 @@ public final class ShadowPass {
     private static final String FRAG_APPLY =
         "#version 310 es\n" +
         "precision mediump float;\n" +
+        "precision lowp sampler2DShadow;\n" +
         "uniform sampler2D uScene;\n" +
         "uniform sampler2DShadow uShadowMap;\n" +
         "uniform float uShadowBias;\n" +
