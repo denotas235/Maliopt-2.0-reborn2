@@ -112,7 +112,7 @@ public class MaliOptMod implements ClientModInitializer, ModMenuApi {
     // ── Pipeline de post-process (chamado por MixinGameRenderer) ─────
     public static void renderPipeline() {
         MinecraftClient mc = MinecraftClient.getInstance();
-        if (mc == null || mc.world == null) return;
+        if (mc == null || mc.world == null || mc.player == null) return;
         MaliOptVisualConfig cfg = MaliOptVisualConfig.get();
         PerformanceGuard.update(mc);
         if (PLSLightingPass.isReady() && cfg.lightingEnabled && PerformanceGuard.lightingPassEnabled()) PLSLightingPass.render(mc);
