@@ -47,7 +47,7 @@ public final class FramebufferUtil {
                 f.setAccessible(true);
                 if (f.getType() == int.class) {
                     int val = f.getInt(fb);
-                    if (val > 0) return val;
+                    if (val > 0 && val != fb.textureWidth && val != fb.textureHeight) return val;
                 }
             }
         } catch (Exception e) {
