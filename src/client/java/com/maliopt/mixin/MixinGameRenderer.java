@@ -27,6 +27,7 @@ public class MixinGameRenderer {
             MaliOptMod.LOGGER.info("[MaliOpt] Init tardio via render hook");
             MaliPipelineOptimizer.init();
             ShaderCacheManager.init();
+            com.maliopt.MaliOptMod.initPasses();
             lateInitDone = true;
         }
     }

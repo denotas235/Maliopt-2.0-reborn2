@@ -88,16 +88,7 @@ public class MaliOptMod implements ClientModInitializer, ModMenuApi {
                 }
 
                 MaliPipelineOptimizer.init();
-                ShaderCacheManager.init();
 
-                // Passes existentes
-                PLSLightingPass.init();
-                FBFetchBloomPass.init();
-
-                // Novos passes visuais
-                ShadowPass.init();
-                SSRPass.init();
-                ColoredLightsPass.init();
 
                 forceDistances(client);
 
@@ -110,6 +101,14 @@ public class MaliOptMod implements ClientModInitializer, ModMenuApi {
     }
 
     // ── Pipeline de post-process (chamado por MixinGameRenderer) ─────
+    public static void initPasses() {
+        PLSLightingPass.init();
+        FBFetchBloomPass.init();
+        ShadowPass.init();
+        SSRPass.init();
+        ColoredLightsPass.init();
+    }
+
     public static void renderPipeline() {
         MinecraftClient mc = MinecraftClient.getInstance();
         if (mc == null || mc.world == null || mc.player == null) return;
