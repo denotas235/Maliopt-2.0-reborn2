@@ -176,7 +176,7 @@ public class FBFetchBloomPass {
     }
 
     private static void phaseExtract(Framebuffer fb, int w, int h) {
-        GL30.glBindFramebuffer(GL30.GL_READ_FRAMEBUFFER, fb.fbo);
+        GL30.glBindFramebuffer(GL30.GL_READ_FRAMEBUFFER, fb.getFramebufferId());
         GL30.glBindFramebuffer(GL30.GL_DRAW_FRAMEBUFFER, sceneCopyFbo);
         GL30.glBlitFramebuffer(0, 0, w, h, 0, 0, w, h, GL11.GL_COLOR_BUFFER_BIT, GL11.GL_NEAREST);
 
@@ -209,7 +209,7 @@ public class FBFetchBloomPass {
     }
 
     private static void phaseComposite(Framebuffer fb, int w, int h) {
-        GL30.glBindFramebuffer(GL30.GL_FRAMEBUFFER, fb.fbo);
+        GL30.glBindFramebuffer(GL30.GL_FRAMEBUFFER, fb.getFramebufferId());
         GL11.glViewport(0, 0, w, h);
         GL20.glUseProgram(progComposite);
         GL20.glUniform1i(uCompScene, 0);

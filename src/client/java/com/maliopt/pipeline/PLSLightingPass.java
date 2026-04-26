@@ -222,7 +222,7 @@ public class PLSLightingPass {
 
         // Lê a cena actual do framebuffer do Minecraft
         GL13.glActiveTexture(GL13.GL_TEXTURE0);
-        GL11.glBindTexture(GL11.GL_TEXTURE_2D, fb.getColorAttachment());
+        GL11.glBindTexture(GL11.GL_TEXTURE_2D, fb.getColorAttachmentId());
 
         GL30.glBindVertexArray(quadVao);
         GL11.glDrawArrays(GL11.GL_TRIANGLES, 0, 3);
@@ -231,7 +231,7 @@ public class PLSLightingPass {
 
         // Blit resultado → framebuffer principal do Minecraft
         GL30.glBindFramebuffer(GL30.GL_READ_FRAMEBUFFER, outputFbo);
-        GL30.glBindFramebuffer(GL30.GL_DRAW_FRAMEBUFFER, fb.fbo);
+        GL30.glBindFramebuffer(GL30.GL_DRAW_FRAMEBUFFER, fb.getFramebufferId());
         GL30.glBlitFramebuffer(0, 0, w, h, 0, 0, w, h,
             GL11.GL_COLOR_BUFFER_BIT, GL11.GL_NEAREST);
 
