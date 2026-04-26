@@ -2,15 +2,14 @@ name: Build MaliOpt
 
 on:
   push:
-    branches: [ 1.21.1, main, master, develop ]
+    branches: [ 1.21.1, 1.21.11, main, master, develop ]
   pull_request:
-    branches: [ 1.21.1, main, master ]
+    branches: [ 1.21.1, 1.21.11, main, master ]
   workflow_dispatch:
 
 jobs:
   build:
     runs-on: ubuntu-24.04
-
     steps:
       - name: Checkout do repositório
         uses: actions/checkout@v4
