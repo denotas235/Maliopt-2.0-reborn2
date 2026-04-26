@@ -36,6 +36,8 @@ public class MixinGameRenderer {
                                       boolean tick,
                                       CallbackInfo ci) {
         if (!GPUDetector.isMaliGPU()) return;
+        net.minecraft.client.MinecraftClient mc2 = net.minecraft.client.MinecraftClient.getInstance();
+        if (mc2 == null || mc2.world == null || mc2.player == null) return;
         // Fase 2 — pipeline de post-process + TileBasedOptimizer
         com.maliopt.MaliOptMod.renderPipeline();
         MaliPipelineOptimizer.onFrameEnd();
