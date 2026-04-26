@@ -16,7 +16,7 @@ public final class FramebufferUtil {
      * Retorna 0 se não for possível obter.
      */
     public static int getColorTextureId(Framebuffer fb) {
-        GpuTexture tex = (GpuTexture) fb.getColorAttachment();
+        GpuTexture tex = getColorAttachmentSafe(fb);
         if (tex == null) return 0;
         return getGlId(tex);
     }
@@ -54,6 +54,22 @@ public final class FramebufferUtil {
             // silent fail
         }
         return 0;
+    }
+
+    private static GpuTexture getColorAttachmentSafe(Framebuffer fb) {
+        try {
+            for (java.lang.reflect.Field f : fb.getClass().getDeclaredFields()) {
+                f.setAccessible(true);
+                Object val = f.get(fb);
+                if (val instanceof GpuTexture) return (GpuTexture) val;
+            }
+            for (java.lang.reflect.Field f : fb.getClass().getSuperclass().getDeclaredFields()) {
+                f.setAccessible(true);
+                Object val = f.get(fb);
+                if (val instanceof GpuTexture) return (GpuTexture) val;
+            }
+        } catch (Exception e) {}
+        return null;
     }
 
     private static int getGlId(GpuTexture tex) {
