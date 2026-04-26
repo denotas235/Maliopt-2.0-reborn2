@@ -107,28 +107,6 @@ public class MaliOptMod implements ClientModInitializer, ModMenuApi {
         });
 
         // ── Pipeline de post-process chamado via MixinGameRenderer ──
-
-        // Cleanup
-        ClientLifecycleEvents.CLIENT_STOPPING.register(client -> {
-            PLSLightingPass.cleanup();
-            FBFetchBloomPass.cleanup();
-            ShadowPass.cleanup();
-            SSRPass.cleanup();
-            ColoredLightsPass.cleanup();
-        });
-    }
-
-    // ── Pipeline de post-process (chamado por MixinGameRenderer) ─────
-    public static void renderPipeline() {
-        MinecraftClient mc = MinecraftClient.getInstance();
-        if (mc == null || mc.world == null) return;
-        MaliOptVisualConfig cfg = MaliOptVisualConfig.get();
-        PerformanceGuard.update(mc);
-        if (PLSLightingPass.isReady() && cfg.lightingEnabled && PerformanceGuard.lightingPassEnabled()) PLSLightingPass.render(mc);
-        if (FBFetchBloomPass.isReady() && cfg.bloomEnabled && PerformanceGuard.bloomEnabled()) FBFetchBloomPass.render(mc);
-        if (ShadowPass.isReady() && cfg.shadowsEnabled) ShadowPass.render(mc);
-        if (SSRPass.isReady() && cfg.ssrEnabled) SSRPass.render(mc);
-        if (ColoredLightsPass.isReady() && cfg.coloredLightsEnabled) ColoredLightsPass.render(mc);
     }
 
     // ── Pipeline de post-process (chamado por MixinGameRenderer) ─────
