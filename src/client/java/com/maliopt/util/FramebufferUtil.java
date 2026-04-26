@@ -1,40 +1,49 @@
 package com.maliopt.util;
 
-import com.mojang.blaze3d.textures.GpuTexture;
 import net.minecraft.client.gl.Framebuffer;
 
-/**
- * Utilitário para aceder aos IDs OpenGL do Framebuffer do Minecraft em 1.21.11+.
- * A classe GlTexture (subclasse de GpuTexture) expõe o ID via reflexão.
- */
 public final class FramebufferUtil {
 
     private FramebufferUtil() {}
 
-    /**
-     * Obtém o ID OpenGL da textura de cor do Framebuffer.
-     * Retorna 0 se não for possível obter.
-     */
     public static int getColorTextureId(Framebuffer fb) {
-        GpuTexture tex = getColorAttachmentSafe(fb);
-        if (tex == null) return 0;
-        return getGlId(tex);
+        // 1.21.11 — método público getColorAttachmentId()
+        try {
+            java.lang.reflect.Method m = fb.getClass().getMethod("getColorAttachmentId");
+            return (int) m.invoke(fb);
+        } catch (Exception ignored) {}
+        // Fallback: procurar campo GpuTexture e extrair ID via reflexão
+        try {
+            for (java.lang.reflect.Field f : fb.getClass().getDeclaredFields()) {
+                f.setAccessible(true);
+                Object val = f.get(fb);
+                if (val != null && val.getClass().getSimpleName().contains("Texture")) {
+                    for (java.lang.reflect.Field ff : val.getClass().getDeclaredFields()) {
+                        if (ff.getType() == int.class) {
+                            ff.setAccessible(true);
+                            int id = ff.getInt(val);
+                            if (id > 0) return id;
+                        }
+                    }
+                }
+            }
+        } catch (Exception ignored) {}
+        return 0;
     }
 
-    /**
-     * Obtém o ID OpenGL do FBO do Framebuffer via reflexão no GlFramebuffer interno.
-     * Em 1.21.11 o FBO já não é exposto directamente — usamos reflexão.
-     */
     public static int getFboId(Framebuffer fb) {
+        // 1.21.11 — método público getFramebufferId()
         try {
-            java.lang.reflect.Field[] fields = fb.getClass().getSuperclass().getDeclaredFields();
-            for (java.lang.reflect.Field f : fields) {
+            java.lang.reflect.Method m = fb.getClass().getMethod("getFramebufferId");
+            return (int) m.invoke(fb);
+        } catch (Exception ignored) {}
+        // Fallback: procurar campo GlFramebuffer
+        try {
+            for (java.lang.reflect.Field f : fb.getClass().getSuperclass().getDeclaredFields()) {
                 f.setAccessible(true);
                 Object val = f.get(fb);
                 if (val != null && val.getClass().getSimpleName().equals("GlFramebuffer")) {
-                    // GlFramebuffer tem um campo int com o ID
-                    java.lang.reflect.Field[] fbFields = val.getClass().getDeclaredFields();
-                    for (java.lang.reflect.Field ff : fbFields) {
+                    for (java.lang.reflect.Field ff : val.getClass().getDeclaredFields()) {
                         if (ff.getType() == int.class) {
                             ff.setAccessible(true);
                             return ff.getInt(val);
@@ -42,7 +51,7 @@ public final class FramebufferUtil {
                     }
                 }
             }
-            // Fallback: procurar em todos os campos da classe concreta
+            // Último fallback — primeiro int > 0 que não seja dimensão
             for (java.lang.reflect.Field f : fb.getClass().getDeclaredFields()) {
                 f.setAccessible(true);
                 if (f.getType() == int.class) {
@@ -50,51 +59,7 @@ public final class FramebufferUtil {
                     if (val > 0 && val != fb.textureWidth && val != fb.textureHeight) return val;
                 }
             }
-        } catch (Exception e) {
-            // silent fail
-        }
-        return 0;
-    }
-
-    private static GpuTexture getColorAttachmentSafe(Framebuffer fb) {
-        try {
-            for (java.lang.reflect.Field f : fb.getClass().getDeclaredFields()) {
-                f.setAccessible(true);
-                Object val = f.get(fb);
-                if (val instanceof GpuTexture) return (GpuTexture) val;
-            }
-            for (java.lang.reflect.Field f : fb.getClass().getSuperclass().getDeclaredFields()) {
-                f.setAccessible(true);
-                Object val = f.get(fb);
-                if (val instanceof GpuTexture) return (GpuTexture) val;
-            }
-        } catch (Exception e) {}
-        return null;
-    }
-
-    private static int getGlId(GpuTexture tex) {
-        try {
-            // GlTexture é a subclasse concreta — tem um campo int com o ID GL
-            java.lang.reflect.Field[] fields = tex.getClass().getDeclaredFields();
-            for (java.lang.reflect.Field f : fields) {
-                if (f.getType() == int.class) {
-                    f.setAccessible(true);
-                    int val = f.getInt(tex);
-                    if (val > 0) return val;
-                }
-            }
-            // Tentar na superclasse
-            fields = tex.getClass().getSuperclass().getDeclaredFields();
-            for (java.lang.reflect.Field f : fields) {
-                if (f.getType() == int.class) {
-                    f.setAccessible(true);
-                    int val = f.getInt(tex);
-                    if (val > 0) return val;
-                }
-            }
-        } catch (Exception e) {
-            // silent fail
-        }
+        } catch (Exception ignored) {}
         return 0;
     }
 }
