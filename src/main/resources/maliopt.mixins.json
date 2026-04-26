@@ -2,7 +2,7 @@
   "required": true,
   "package": "com.maliopt.mixin",
   "compatibilityLevel": "JAVA_21",
-  {  "mixins": [],
+  "mixins": [],
   "injectors": {
     "defaultRequire": 1
   },
