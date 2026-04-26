@@ -16,7 +16,7 @@ public final class FramebufferUtil {
      * Retorna 0 se não for possível obter.
      */
     public static int getColorTextureId(Framebuffer fb) {
-        GpuTexture tex = com.maliopt.util.FramebufferUtil.getColorTextureId(fb);
+        GpuTexture tex = (GpuTexture) fb.getColorAttachment();
         if (tex == null) return 0;
         return getGlId(tex);
     }
