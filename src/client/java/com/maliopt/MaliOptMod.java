@@ -110,7 +110,6 @@ public class MaliOptMod implements ClientModInitializer, ModMenuApi {
     }
 
     public static void renderPipeline() {
-        return; // DESATIVADO TEMPORARIAMENTE
         MinecraftClient mc = MinecraftClient.getInstance();
         if (mc == null || mc.world == null || mc.player == null) return;
         MaliOptVisualConfig cfg = MaliOptVisualConfig.get();

@@ -27,7 +27,7 @@ public class MixinGameRenderer {
             MaliOptMod.LOGGER.info("[MaliOpt] Init tardio via render hook");
             MaliPipelineOptimizer.init();
             ShaderCacheManager.init();
-            com.maliopt.MaliOptMod.initPasses();
+            // com.maliopt.MaliOptMod.initPasses(); // DESATIVADO
             lateInitDone = true;
         }
     }
@@ -40,7 +40,7 @@ public class MixinGameRenderer {
         net.minecraft.client.MinecraftClient mc2 = net.minecraft.client.MinecraftClient.getInstance();
         if (mc2 == null || mc2.world == null || mc2.player == null) return;
         // Fase 2 — pipeline de post-process + TileBasedOptimizer
-        com.maliopt.MaliOptMod.renderPipeline();
+        // com.maliopt.MaliOptMod.renderPipeline(); // DESATIVADO
         MaliPipelineOptimizer.onFrameEnd();
     }
 }
