@@ -36,7 +36,8 @@ public class MixinGameRenderer {
                                       boolean tick,
                                       CallbackInfo ci) {
         if (!GPUDetector.isMaliGPU()) return;
-        // Fase 2 — delega para TileBasedOptimizer
+        // Fase 2 — pipeline de post-process + TileBasedOptimizer
+        com.maliopt.MaliOptMod.renderPipeline();
         MaliPipelineOptimizer.onFrameEnd();
     }
 }

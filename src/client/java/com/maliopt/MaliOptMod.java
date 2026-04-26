@@ -22,7 +22,6 @@ import com.terraformersmc.modmenu.api.ConfigScreenFactory;
 import com.terraformersmc.modmenu.api.ModMenuApi;
 import net.fabricmc.api.ClientModInitializer;
 import net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientLifecycleEvents;
-import net.fabricmc.fabric.api.client.rendering.v1.WorldRenderEvents;
 
 import net.fabricmc.loader.api.FabricLoader;
 import net.minecraft.client.MinecraftClient;
@@ -107,42 +106,7 @@ public class MaliOptMod implements ClientModInitializer, ModMenuApi {
             }
         });
 
-        // ── Pipeline de post-process ──────────────────────────────────
-        WorldRenderEvents.LAST.register(context -> {
-            MinecraftClient mc = MinecraftClient.getInstance();
-            MaliOptVisualConfig cfg = MaliOptVisualConfig.get();
-
-            PerformanceGuard.update(mc);
-
-            // Lighting pass — respeita toggle do menu
-            if (PLSLightingPass.isReady()
-                    && cfg.lightingEnabled
-                    && PerformanceGuard.lightingPassEnabled()) {
-                PLSLightingPass.render(mc);
-            }
-
-            // Bloom — respeita toggle do menu
-            if (FBFetchBloomPass.isReady()
-                    && cfg.bloomEnabled
-                    && PerformanceGuard.bloomEnabled()) {
-                FBFetchBloomPass.render(mc);
-            }
-
-            // Sombras
-            if (ShadowPass.isReady() && cfg.shadowsEnabled) {
-                ShadowPass.render(mc);
-            }
-
-            // SSR
-            if (SSRPass.isReady() && cfg.ssrEnabled) {
-                SSRPass.render(mc);
-            }
-
-            // Luzes coloridas
-            if (ColoredLightsPass.isReady() && cfg.coloredLightsEnabled) {
-                ColoredLightsPass.render(mc);
-            }
-        });
+        // ── Pipeline de post-process chamado via MixinGameRenderer ──
 
         // Cleanup
         ClientLifecycleEvents.CLIENT_STOPPING.register(client -> {
@@ -152,6 +116,32 @@ public class MaliOptMod implements ClientModInitializer, ModMenuApi {
             SSRPass.cleanup();
             ColoredLightsPass.cleanup();
         });
+    }
+
+    // ── Pipeline de post-process (chamado por MixinGameRenderer) ─────
+    public static void renderPipeline() {
+        MinecraftClient mc = MinecraftClient.getInstance();
+        if (mc == null || mc.world == null) return;
+        MaliOptVisualConfig cfg = MaliOptVisualConfig.get();
+        PerformanceGuard.update(mc);
+        if (PLSLightingPass.isReady() && cfg.lightingEnabled && PerformanceGuard.lightingPassEnabled()) PLSLightingPass.render(mc);
+        if (FBFetchBloomPass.isReady() && cfg.bloomEnabled && PerformanceGuard.bloomEnabled()) FBFetchBloomPass.render(mc);
+        if (ShadowPass.isReady() && cfg.shadowsEnabled) ShadowPass.render(mc);
+        if (SSRPass.isReady() && cfg.ssrEnabled) SSRPass.render(mc);
+        if (ColoredLightsPass.isReady() && cfg.coloredLightsEnabled) ColoredLightsPass.render(mc);
+    }
+
+    // ── Pipeline de post-process (chamado por MixinGameRenderer) ─────
+    public static void renderPipeline() {
+        MinecraftClient mc = MinecraftClient.getInstance();
+        if (mc == null || mc.world == null) return;
+        MaliOptVisualConfig cfg = MaliOptVisualConfig.get();
+        PerformanceGuard.update(mc);
+        if (PLSLightingPass.isReady() && cfg.lightingEnabled && PerformanceGuard.lightingPassEnabled()) PLSLightingPass.render(mc);
+        if (FBFetchBloomPass.isReady() && cfg.bloomEnabled && PerformanceGuard.bloomEnabled()) FBFetchBloomPass.render(mc);
+        if (ShadowPass.isReady() && cfg.shadowsEnabled) ShadowPass.render(mc);
+        if (SSRPass.isReady() && cfg.ssrEnabled) SSRPass.render(mc);
+        if (ColoredLightsPass.isReady() && cfg.coloredLightsEnabled) ColoredLightsPass.render(mc);
     }
 
     // ── Plugin nativo ─────────────────────────────────────────────────
