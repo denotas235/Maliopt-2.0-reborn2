@@ -39,7 +39,7 @@ dependencies {
     modImplementation "net.fabricmc.fabric-api:fabric-api:${project.fabric_api_version}"
 include "net.fabricmc.fabric-api:fabric-api:${project.fabric_api_version}"
 
-    modImplementation "dev.isxander:yet-another-config-lib:3.8.2+1.21.11-fabric"
+    modImplementation "dev.isxander:yet-another-config-lib:3.4.0+1.21.1-fabric"
     modImplementation "com.terraformersmc:modmenu:17.0.0-beta.1"
 }
 
