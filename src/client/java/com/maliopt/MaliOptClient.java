@@ -5,6 +5,6 @@ import net.fabricmc.api.ClientModInitializer;
 public class MaliOptClient implements ClientModInitializer {
     @Override
     public void onInitializeClient() {
-        // cliente
+        // A detecção é feita no lado comum (MaliOptMod), nada a fazer aqui.
     }
 }
