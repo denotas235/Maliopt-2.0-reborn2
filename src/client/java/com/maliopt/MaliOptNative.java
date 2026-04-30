@@ -65,4 +65,10 @@ public final class MaliOptNative {
     // ── Debug ──────────────────────────────────────────────────────────
     public static native String getRawGLExtensions();
     public static native String getRawEGLExtensions();
+
+    // ── NOVA: Deteção direta do sistema (sem plugin) ──────────────────
+    /** Obtém as extensões GLES diretamente do driver do sistema,
+     *  criando um contexto EGL temporário. Retorna array de strings
+     *  ou null se falhar. Não causa crash. */
+    public static native String[] getSystemGLESExtensions();
 }

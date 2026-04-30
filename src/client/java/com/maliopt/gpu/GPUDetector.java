@@ -1,9 +1,11 @@
 package com.maliopt.gpu;
 
 import com.maliopt.MaliOptMod;
+import com.maliopt.MaliOptNative;
 import org.lwjgl.opengl.GL11;
 import org.lwjgl.opengl.GL30;
 
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashSet;
 import java.util.Set;
@@ -49,6 +51,14 @@ public class GPUDetector {
     public static Set<String> getAllExtensions() {
         if (cachedExtensions != null) return cachedExtensions;
 
+        // NOVA PRIORIDADE 0 — Deteção direta do sistema (JNI)
+        Set<String> systemExts = getSystemGLESExtensionsSafe();
+        if (!systemExts.isEmpty()) {
+            MaliOptMod.LOGGER.info("[MaliOpt] Extensões via driver nativo do sistema: {}", systemExts.size());
+            cachedExtensions = systemExts;
+            return cachedExtensions;
+        }
+
         // PRIORIDADE 1 — MobileGlues backend access
         if (MobileGluesDetector.isActive() && MobileGluesDetector.hasBackendAccess()) {
             Set<String> backendExts = MobileGluesDetector.getBackendExtensions();
@@ -85,6 +95,27 @@ public class GPUDetector {
 
         cachedExtensions = Collections.unmodifiableSet(exts);
         return cachedExtensions;
+    }
+
+    /**
+     * Tenta obter as extensões via novo método JNI (driver nativo).
+     * Se falhar ou retornar null, devolve um Set vazio.
+     */
+    private static Set<String> getSystemGLESExtensionsSafe() {
+        try {
+            if (!MaliOptMod.isNativePluginLoaded()) {
+                return Collections.emptySet();
+            }
+            String[] exts = MaliOptNative.getSystemGLESExtensions();
+            if (exts != null && exts.length > 0) {
+                Set<String> set = new HashSet<>(Arrays.asList(exts));
+                set.remove(""); // Remove possíveis strings vazias
+                return Collections.unmodifiableSet(set);
+            }
+        } catch (Exception e) {
+            MaliOptMod.LOGGER.warn("[MaliOpt] getSystemGLESExtensions falhou: {}", e.getMessage());
+        }
+        return Collections.emptySet();
     }
 
     public static boolean hasExtension(String ext) {
